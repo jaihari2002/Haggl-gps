@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HAGGL Logistics – Driver Tracking</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f1f5f9;
+    }
+
+    header {
+      background: #0f172a;
+      color: white;
+      padding: 14px 16px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    header span {
+      color: #facc15;
+    }
+
+    #map {
+      height: 70vh;
+      width: 100%;
+    }
+
+    .panel {
+      padding: 16px;
+      background: white;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      font-size: 14px;
+      font-weight: 800;
+      background: #facc15;
+      color: #0f172a;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 12px;
+      text-align: center;
+      color: #334155;
+      font-weight: 600;
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header>
+    🚛 <span>HAGGL</span> LOGISTICS
+  </header>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+  <!-- DRIVER PANEL -->
+  <div class="panel">
+    <button onclick="startTracking()">START / UPDATE LOCATION</button>
+    <div class="status" id="status">Waiting for driver GPS…</div>
+    <div class="footer-note">
+      Keep this screen open during the trip
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    let map = L.map("map").setView([20.5937, 78.9629], 5);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(map);
+
+    let driverMarker = null;
+    let accuracyCircle = null;
+
+    function startTracking() {
+      const status = document.getElementById("status");
+
+      if (!navigator.geolocation) {
+        status.innerText = "❌ GPS not supported on this device";
+        return;
+      }
+
+      navigator.permissions.query({ name: "geolocation" }).then(result => {
+        if (result.state === "denied") {
+          alert(
+            "📍 LOCATION BLOCKED\n\n" +
+            "Enable location permission:\n" +
+            "Chrome → 🔒 Site settings → Location → Allow\n\n" +
+            "Reload the page after enabling."
+          );
+          return;
+        }
+
+        status.innerText = "📡 Fetching live GPS…";
+
+        navigator.geolocation.getCurrentPosition(
+          success,
+          error,
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          }
+        );
+      });
+    }
+
+    function success(position) {
+      const { latitude, longitude, accuracy } = position.coords;
+      const status = document.getElementById("status");
+
+      status.innerText = `✅ Location Updated • Accuracy ±${Math.round(accuracy)} m`;
+
+      const latlng = [latitude, longitude];
+
+      if (driverMarker) map.removeLayer(driverMarker);
+      if (accuracyCircle) map.removeLayer(accuracyCircle);
+
+      driverMarker = L.marker(latlng).addTo(map);
+      accuracyCircle = L.circle(latlng, {
+        radius: accuracy,
+        color: "#facc15",
+        fillOpacity: 0.2
+      }).addTo(map);
+
+      map.setView(latlng, 16);
+
+      // Backend hook (optional)
+      /*
+      fetch("/api/driver-location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: latitude,
+          lng: longitude,
+          accuracy,
+          company: "HAGGL Logistics",
+          time: Date.now()
+        })
+      });
+      */
+    }
+
+    function error(err) {
+      const status = document.getElementById("status");
+      status.innerText = "❌ GPS Error: " + err.message;
+    }
+  </script>
+
+</body>
+</html>
